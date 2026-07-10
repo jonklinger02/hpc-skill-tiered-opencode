@@ -1,0 +1,46 @@
+{
+  "id": "monorepo",
+  "description": "Workspace monorepo (apps/* and packages/*); role mapped per package.",
+  "priority": 70,
+  "match": {
+    "frameworks": [
+      "turborepo",
+      "nx",
+      "lerna"
+    ],
+    "languages": [],
+    "signals": [
+      "monorepo"
+    ]
+  },
+  "root_markers": [
+    "turbo.json",
+    "nx.json",
+    "pnpm-workspace.yaml",
+    "package.json"
+  ],
+  "entry_files": [
+    "package.json"
+  ],
+  "default_role": "package",
+  "classify": [
+    {
+      "pattern": "(^|/)apps/",
+      "role": "app"
+    },
+    {
+      "pattern": "(^|/)packages/",
+      "role": "package"
+    },
+    {
+      "pattern": "(^|/)(turbo\\.json|nx\\.json|pnpm-workspace\\.yaml)$",
+      "role": "config"
+    }
+  ],
+  "layout": {
+    "app": "apps",
+    "package": "packages",
+    "config": "."
+  },
+  "enforce": []
+}

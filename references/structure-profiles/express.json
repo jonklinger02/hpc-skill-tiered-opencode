@@ -1,0 +1,81 @@
+{
+  "id": "express",
+  "description": "Express/Node API server (src/ with routes/controllers/services).",
+  "priority": 45,
+  "match": {
+    "frameworks": [
+      "express"
+    ],
+    "languages": [],
+    "signals": [
+      "api_server"
+    ]
+  },
+  "root_markers": [
+    "package.json",
+    "tsconfig.json"
+  ],
+  "entry_files": [
+    "src/server/app.ts",
+    "src/server/app.js"
+  ],
+  "default_role": "lib",
+  "classify": [
+    {
+      "pattern": "(^|/)(tsconfig|jest\\.config|\\.eslintrc)\\.",
+      "role": "config"
+    },
+    {
+      "pattern": "\\.(test|spec)\\.[a-zA-Z0-9]+$",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)(__tests__|tests?|e2e)/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)routes?/",
+      "role": "route"
+    },
+    {
+      "pattern": "(^|/)controllers?/",
+      "role": "controller"
+    },
+    {
+      "pattern": "(^|/)middlewares?/",
+      "role": "middleware"
+    },
+    {
+      "pattern": "(^|/)models?/|(^|/)entit(y|ies)/",
+      "role": "model"
+    },
+    {
+      "pattern": "(^|/)services?/",
+      "role": "service"
+    },
+    {
+      "pattern": "(^|/)(db|database|migrations?)/",
+      "role": "db"
+    },
+    {
+      "pattern": "(app|server|index)\\.[tj]s$",
+      "role": "server"
+    }
+  ],
+  "layout": {
+    "server": "src/server",
+    "route": "src/routes",
+    "controller": "src/controllers",
+    "middleware": "src/middleware",
+    "model": "src/models",
+    "service": "src/services",
+    "db": "src/db",
+    "lib": "src/lib",
+    "config": ".",
+    "test": "test"
+  },
+  "enforce": [
+    "route",
+    "controller"
+  ]
+}

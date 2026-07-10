@@ -1,0 +1,56 @@
+{
+  "id": "go",
+  "description": "Go standard layout (cmd/, internal/, pkg/; tests beside source).",
+  "priority": 45,
+  "match": {
+    "frameworks": [],
+    "languages": [
+      "go",
+      "golang"
+    ],
+    "signals": [
+      "go"
+    ]
+  },
+  "root_markers": [
+    "go.mod"
+  ],
+  "entry_files": [
+    "cmd",
+    "go.mod"
+  ],
+  "default_role": "pkg",
+  "classify": [
+    {
+      "pattern": "_test\\.go$",
+      "role": "test"
+    },
+    {
+      "pattern": "(go\\.mod|go\\.sum)$",
+      "role": "config"
+    },
+    {
+      "pattern": "(^|/)cmd/",
+      "role": "entry"
+    },
+    {
+      "pattern": "(^|/)internal/",
+      "role": "internal"
+    },
+    {
+      "pattern": "(^|/)pkg/",
+      "role": "pkg"
+    }
+  ],
+  "layout": {
+    "entry": "cmd",
+    "internal": "internal",
+    "pkg": "pkg",
+    "config": ".",
+    "test": null
+  },
+  "enforce": [
+    "entry",
+    "internal"
+  ]
+}

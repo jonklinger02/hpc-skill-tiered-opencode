@@ -1,0 +1,51 @@
+{
+  "id": "rust",
+  "description": "Rust crate (src/, tests/ for integration tests, Cargo.toml at root).",
+  "priority": 45,
+  "match": {
+    "frameworks": [],
+    "languages": [
+      "rust"
+    ],
+    "signals": [
+      "cargo"
+    ]
+  },
+  "root_markers": [
+    "Cargo.toml"
+  ],
+  "entry_files": [
+    "src/main.rs",
+    "src/lib.rs",
+    "Cargo.toml"
+  ],
+  "default_role": "module",
+  "classify": [
+    {
+      "pattern": "(Cargo\\.toml|Cargo\\.lock)$",
+      "role": "config"
+    },
+    {
+      "pattern": "(^|/)tests/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)benches/",
+      "role": "bench"
+    },
+    {
+      "pattern": "\\.rs$",
+      "role": "module"
+    }
+  ],
+  "layout": {
+    "module": "src",
+    "test": "tests",
+    "bench": "benches",
+    "config": "."
+  },
+  "enforce": [
+    "module",
+    "test"
+  ]
+}

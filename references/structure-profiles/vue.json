@@ -1,0 +1,75 @@
+{
+  "id": "vue",
+  "description": "Vue 3 SFC project (src/ layout, components/views/composables/stores).",
+  "priority": 50,
+  "match": {
+    "frameworks": [
+      "vue",
+      "nuxt"
+    ],
+    "languages": [],
+    "signals": [
+      "web_ui"
+    ]
+  },
+  "root_markers": [
+    "vite.config.ts",
+    "vue.config.js",
+    "package.json"
+  ],
+  "entry_files": [
+    "src/main.ts",
+    "src/App.vue"
+  ],
+  "default_role": "lib",
+  "classify": [
+    {
+      "pattern": "(^|/)(vite\\.config|vue\\.config|tsconfig)\\.",
+      "role": "config"
+    },
+    {
+      "pattern": "\\.(test|spec)\\.[a-zA-Z0-9]+$",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)(__tests__|tests?|e2e)/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)views?/",
+      "role": "view"
+    },
+    {
+      "pattern": "(^|/)composables?/|/use[A-Z][A-Za-z0-9]*\\.[tj]s$",
+      "role": "composable"
+    },
+    {
+      "pattern": "(^|/)stores?/",
+      "role": "store"
+    },
+    {
+      "pattern": "(^|/)router",
+      "role": "router"
+    },
+    {
+      "pattern": "\\.(css|scss|sass|less)$",
+      "role": "style"
+    },
+    {
+      "pattern": "(^|/)components?/|\\.vue$",
+      "role": "component"
+    }
+  ],
+  "layout": {
+    "component": "src/components",
+    "view": "src/views",
+    "composable": "src/composables",
+    "store": "src/stores",
+    "router": "src/router",
+    "style": "src/assets",
+    "lib": "src/lib",
+    "config": ".",
+    "test": "src/__tests__"
+  },
+  "enforce": []
+}

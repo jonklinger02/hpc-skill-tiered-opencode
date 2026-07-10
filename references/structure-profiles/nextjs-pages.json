@@ -1,0 +1,78 @@
+{
+  "id": "nextjs-pages",
+  "description": "Next.js Pages Router (pages/ directory, pages/api handlers).",
+  "priority": 60,
+  "match": {
+    "frameworks": [
+      "nextjs",
+      "next"
+    ],
+    "languages": [],
+    "signals": [
+      "pages-router"
+    ]
+  },
+  "root_markers": [
+    "next.config.js",
+    "next.config.ts",
+    "package.json"
+  ],
+  "entry_files": [
+    "pages/_app.tsx",
+    "pages/index.tsx",
+    "next.config.js"
+  ],
+  "default_role": "lib",
+  "classify": [
+    {
+      "pattern": "(^|/)(next\\.config|tailwind\\.config|tsconfig)\\.",
+      "role": "config"
+    },
+    {
+      "pattern": "\\.(test|spec)\\.[a-zA-Z0-9]+$",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)(__tests__|tests?|e2e)/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)pages/api/",
+      "role": "api"
+    },
+    {
+      "pattern": "(^|/)pages/",
+      "role": "route"
+    },
+    {
+      "pattern": "(^|/)app/",
+      "role": "route"
+    },
+    {
+      "pattern": "\\.(css|scss|sass|less)$",
+      "role": "style"
+    },
+    {
+      "pattern": "(^|/)hooks?/|/use[A-Z][A-Za-z0-9]*\\.[tj]sx?$",
+      "role": "hook"
+    },
+    {
+      "pattern": "(^|/)components?/|\\.(tsx|jsx)$",
+      "role": "component"
+    }
+  ],
+  "layout": {
+    "route": "pages",
+    "api": "pages/api",
+    "component": "components",
+    "hook": "hooks",
+    "style": "styles",
+    "lib": "lib",
+    "config": ".",
+    "test": "__tests__"
+  },
+  "enforce": [
+    "route",
+    "api"
+  ]
+}

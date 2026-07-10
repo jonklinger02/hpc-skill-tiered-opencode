@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Model tier registry — the SINGLE place that maps work to model power/cost.
+#
+# OpenCode variant: tiers use { providerID, modelID } pairs (multi-provider).
+# resolveModel() in scripts/lib/models.js returns { providerID, modelID }.
+#
+# Every model-spawning script resolves its `--model` (and `--worker-model`,
+# `--validator-model`, …) value through scripts/lib/models.js. A value may be:
+#   • a TIER name      (cheap | standard | capable | frontier)
+#   • an ASSIGNMENT    (worker, csuite_council, acceptance_judge, …) → its tier
+#   • a "provider/model" string → split and returned as { providerID, modelID }
+#
+# To re-point the whole build to different models, edit ONLY this file. Make a
+# tier cheaper/more capable in `tiers:`, or move one phase to a different tier in
+# `assignments:` — every step that uses that phase follows automatically.
+#
+# Provider IDs default to anthropic. To use opencode-go or openai providers,
+# override cheap/standard to e.g.:
+#   cheap: { providerID: opencode-go, modelID: deepseek-v4-flash }
+# ─────────────────────────────────────────────────────────────────────────────
+
+tiers:
+  # Cheap, fast, high-volume. Mechanical work with a tight spec and a
+  # deterministic check downstream. Thrash-prone on cross-module reasoning —
+  # the promotion ladder moves a stuck worker up a tier rather than retrying here.
+  cheap:    { providerID: anthropic, modelID: claude-haiku-4-5 }
+
+  # The workhorse. Reasoning-heavy but routine: most councils, triage, contract
+  # (integration) validation, document generation.
+  standard: { providerID: anthropic, modelID: claude-sonnet-4-6 }
+
+  # Hard, cross-cutting judgment where a wrong call is expensive to unwind:
+  # escalations, top-tier recovery, the second e2e-repair tier.
+  capable:  { providerID: anthropic, modelID: claude-opus-4-8 }
+
+  # The few highest-leverage correctness gates where the most capable model
+  # earns its cost outright: the C-Suite plan the whole build inherits, and the
+  # acceptance verdict that decides ship / no-ship.
+  frontier: { providerID: anthropic, modelID: claude-fable-5 }
+
+assignments:
+  # ── Execution workers (the promotion ladder: cheap → standard → capable) ──
+  worker:                cheap      # default parallel code worker
+  worker_promoted:       standard   # set on a task that exhausted caps at `cheap`
+  worker_escalated:      capable    # last resort before BLOCKED
+
+  # ── Per-file validation ──
+  schema_validator:      cheap      # local symbol/shape check — deterministic, high volume
+  integration_validator: standard   # deep contract (producer/consumer) validation
+
+  # ── Phase-3 static-build triage ──
+  triage:                standard   # verdict per failure cluster
+  patch:                 cheap      # applies a Sonnet-issued quick_fix directive
+
+  # ── Planning councils ──
+  engineer_council:      standard
+  director_council:      standard
+  csuite_council:        frontier   # the plan every later tier is bound by
+  escalation:            capable    # resolve a worker's ambiguity envelope
+
+  # ── Corpus / acceptance prep ──
+  corpus_filter:         standard
+  acceptance_extract:    standard
+
+  # ── Phase-4 e2e ──
+  e2e_generate:          standard
+  e2e_chase_tier1:       standard   # rounds 0–1: cheap-and-fast single agent
+  e2e_chase_tier2:       capable    # round 2: upgrade, don't repeat tier-1's approach
+
+  # ── Phase-5 acceptance ──
+  acceptance_judge:      frontier   # one judge per criterion vs the running app
+
+  # ── Recovery ladder councils ──
+  recovery_director:     standard
+  recovery_csuite:       capable

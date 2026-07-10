@@ -1,0 +1,70 @@
+{
+  "id": "fastify",
+  "description": "Fastify API server (src/ with routes/plugins/services).",
+  "priority": 45,
+  "match": {
+    "frameworks": [
+      "fastify"
+    ],
+    "languages": [],
+    "signals": [
+      "api_server"
+    ]
+  },
+  "root_markers": [
+    "package.json",
+    "tsconfig.json"
+  ],
+  "entry_files": [
+    "src/server/server.ts",
+    "src/server/server.js"
+  ],
+  "default_role": "lib",
+  "classify": [
+    {
+      "pattern": "(^|/)(tsconfig|\\.eslintrc)\\.",
+      "role": "config"
+    },
+    {
+      "pattern": "\\.(test|spec)\\.[a-zA-Z0-9]+$",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)(__tests__|tests?|e2e)/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)routes?/",
+      "role": "route"
+    },
+    {
+      "pattern": "(^|/)plugins?/",
+      "role": "plugin"
+    },
+    {
+      "pattern": "(^|/)services?/",
+      "role": "service"
+    },
+    {
+      "pattern": "(^|/)(db|database|migrations?)/",
+      "role": "db"
+    },
+    {
+      "pattern": "(app|server|index)\\.[tj]s$",
+      "role": "server"
+    }
+  ],
+  "layout": {
+    "server": "src/server",
+    "route": "src/routes",
+    "plugin": "src/plugins",
+    "service": "src/services",
+    "db": "src/db",
+    "lib": "src/lib",
+    "config": ".",
+    "test": "test"
+  },
+  "enforce": [
+    "route"
+  ]
+}

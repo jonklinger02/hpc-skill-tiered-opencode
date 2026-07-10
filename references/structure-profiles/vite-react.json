@@ -1,0 +1,74 @@
+{
+  "id": "vite-react",
+  "description": "Vite + React SPA (src/ layout, @/ alias to src).",
+  "priority": 50,
+  "match": {
+    "frameworks": [
+      "vite",
+      "react",
+      "create-react-app",
+      "cra"
+    ],
+    "languages": [],
+    "signals": [
+      "web_ui"
+    ]
+  },
+  "root_markers": [
+    "vite.config.ts",
+    "vite.config.js",
+    "index.html",
+    "package.json"
+  ],
+  "entry_files": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "index.html"
+  ],
+  "default_role": "lib",
+  "classify": [
+    {
+      "pattern": "(^|/)(vite\\.config|tsconfig|tailwind\\.config)\\.",
+      "role": "config"
+    },
+    {
+      "pattern": "\\.(test|spec)\\.[a-zA-Z0-9]+$",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)(__tests__|tests?|e2e)/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)hooks?/|/use[A-Z][A-Za-z0-9]*\\.[tj]sx?$",
+      "role": "hook"
+    },
+    {
+      "pattern": "(^|/)pages?/|(^|/)routes?/",
+      "role": "page"
+    },
+    {
+      "pattern": "(^|/)api/|(^|/)services?/",
+      "role": "api"
+    },
+    {
+      "pattern": "\\.(css|scss|sass|less)$",
+      "role": "style"
+    },
+    {
+      "pattern": "(^|/)components?/|\\.(tsx|jsx)$",
+      "role": "component"
+    }
+  ],
+  "layout": {
+    "component": "src/components",
+    "hook": "src/hooks",
+    "page": "src/pages",
+    "api": "src/api",
+    "style": "src/styles",
+    "lib": "src/lib",
+    "config": ".",
+    "test": "src/__tests__"
+  },
+  "enforce": []
+}

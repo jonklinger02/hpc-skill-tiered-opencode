@@ -1,0 +1,50 @@
+{
+  "id": "python-src",
+  "description": "Python src-layout (package under src/, tests under tests/).",
+  "priority": 40,
+  "match": {
+    "frameworks": [
+      "fastapi",
+      "flask",
+      "django"
+    ],
+    "languages": [
+      "python"
+    ],
+    "signals": [
+      "control_plane"
+    ]
+  },
+  "root_markers": [
+    "pyproject.toml",
+    "setup.cfg",
+    "setup.py"
+  ],
+  "entry_files": [
+    "src",
+    "pyproject.toml"
+  ],
+  "default_role": "module",
+  "classify": [
+    {
+      "pattern": "(pyproject\\.toml|setup\\.(py|cfg)|requirements\\.txt|tox\\.ini)$",
+      "role": "config"
+    },
+    {
+      "pattern": "(^|/)tests?/|(^|/)test_[^/]*\\.py$|_test\\.py$",
+      "role": "test"
+    },
+    {
+      "pattern": "\\.py$",
+      "role": "module"
+    }
+  ],
+  "layout": {
+    "test": "tests",
+    "config": ".",
+    "module": null
+  },
+  "enforce": [
+    "test"
+  ]
+}

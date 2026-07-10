@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HPC Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --fg: #c9d1d9;
+    --muted: #8b949e; --accent: #58a6ff; --good: #3fb950; --warn: #d29922;
+    --bad: #f85149; --info: #79c0ff; --dim: #484f58;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px; line-height: 1.4; height: 100%; }
+  code, pre, .mono { font-family: ui-monospace, "SF Mono", Monaco, Consolas, monospace; }
+
+  header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--panel); position: sticky; top: 0; z-index: 10; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  .workspace { color: var(--muted); font-size: 12px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; background: #0b0f14; border: 1px solid var(--border); }
+  .pill .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pill.PLANNED .v { color: var(--info); }
+  .pill.IN_PROGRESS .v { color: var(--warn); }
+  .pill.COMPLETE .v { color: var(--good); }
+  .pill.BLOCKED .v { color: var(--bad); }
+  .pill.ESCALATED .v { color: var(--warn); }
+  .pill.LOCKED .v { color: var(--muted); }
+  .pill.UNKNOWN .v { color: var(--dim); }
+
+  .progressbar { flex: 1; min-width: 200px; height: 8px; background: #0b0f14; border-radius: 4px; overflow: hidden; display: flex; }
+  .progressbar > span { display: block; height: 100%; }
+  .progressbar > .COMPLETE { background: var(--good); }
+  .progressbar > .IN_PROGRESS { background: var(--warn); }
+  .progressbar > .BLOCKED { background: var(--bad); }
+  .progressbar > .PLANNED { background: #30363d; }
+  .progressbar > .ESCALATED { background: #d29922; }
+
+  nav { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--panel); padding: 0 14px; }
+  nav button { background: transparent; border: 0; color: var(--muted); padding: 10px 14px; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+  nav button.active { color: var(--fg); border-bottom-color: var(--accent); }
+  nav button:hover { color: var(--fg); }
+
+  main { padding: 14px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  .panel h2 { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; cursor: pointer; user-select: none; }
+  tbody tr:hover { background: #0b0f14; cursor: pointer; }
+  td.id { font-family: ui-monospace, monospace; font-size: 12px; }
+  td.status { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 600; }
+  td.status.PLANNED { color: var(--info); }
+  td.status.IN_PROGRESS { color: var(--warn); }
+  td.status.COMPLETE { color: var(--good); }
+  td.status.BLOCKED { color: var(--bad); }
+  td.status.ESCALATED { color: var(--warn); }
+  td.status.LOCKED { color: var(--muted); }
+  td.err { color: var(--muted); font-size: 12px; max-width: 600px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+  input[type=text], select { background: #0b0f14; color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 13px; }
+  input[type=text]:focus, select:focus { outline: none; border-color: var(--accent); }
+  button.btn { background: #21262d; color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+  button.btn:hover { background: #30363d; }
+  button.btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+
+  pre.code { background: #0b0f14; color: var(--fg); padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; max-height: 60vh; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: flex-start; justify-content: center; padding: 30px; z-index: 100; overflow-y: auto; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; max-width: 1100px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 16px; }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .modal-head h3 { margin: 0; font-size: 15px; }
+  .close { background: transparent; border: 0; color: var(--muted); font-size: 22px; cursor: pointer; }
+  .close:hover { color: var(--fg); }
+
+  /* DAG */
+  #dag-svg { width: 100%; height: 75vh; background: #0b0f14; border: 1px solid var(--border); border-radius: 4px; cursor: grab; }
+  #dag-svg.dragging { cursor: grabbing; }
+  .node circle { stroke-width: 1.5; }
+  .node.PLANNED circle { fill: #1f2937; stroke: var(--info); }
+  .node.IN_PROGRESS circle { fill: #2a2210; stroke: var(--warn); }
+  .node.COMPLETE circle { fill: #0f2a18; stroke: var(--good); }
+  .node.BLOCKED circle { fill: #2a0f12; stroke: var(--bad); }
+  .node.ESCALATED circle { fill: #2a2210; stroke: var(--warn); }
+  .node.LOCKED circle { fill: #1f2937; stroke: var(--muted); }
+  .node.UNKNOWN circle { fill: #1a1f24; stroke: var(--dim); }
+  .node text { fill: var(--fg); font-size: 9px; pointer-events: none; }
+  .edge { stroke: #30363d; stroke-width: 1; fill: none; }
+  .edge.highlight { stroke: var(--accent); stroke-width: 2; }
+  .node.dim circle { opacity: 0.25; }
+  .node.dim text { opacity: 0.25; }
+
+  /* Logs */
+  pre.log { background: #0b0f14; color: var(--fg); padding: 10px; border-radius: 4px; font-size: 12px; max-height: 70vh; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
+  pre.log .ts { color: var(--dim); }
+  pre.log .err { color: var(--bad); }
+  pre.log .ok { color: var(--good); }
+  pre.log .warn { color: var(--warn); }
+  pre.log .info { color: var(--info); }
+
+  /* Playback */
+  .playback-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .playback-controls input[type=range] { flex: 1; }
+  .event-list { font-family: ui-monospace, monospace; font-size: 12px; max-height: 60vh; overflow-y: auto; background: #0b0f14; padding: 10px; border-radius: 4px; }
+  .event-list .row { padding: 3px 0; }
+  .event-list .ts { color: var(--dim); }
+  .event-list .kind { display: inline-block; width: 130px; }
+  .event-list .kind.task_ok { color: var(--good); }
+  .event-list .kind.worker_err { color: var(--bad); }
+  .event-list .kind.validator_err { color: var(--bad); }
+  .event-list .kind.worker_promoted { color: var(--warn); }
+  .event-list .kind.escalation { color: var(--warn); }
+  .event-list .kind.normalize { color: var(--info); }
+  .event-list .kind.rescue { color: var(--accent); }
+
+  /* Manifest tree */
+  .manifest-tree { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
+  .tree-pane { max-height: 75vh; overflow-y: auto; }
+  .tree-section h4 { margin: 8px 0 4px 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .tree-item { padding: 3px 6px; cursor: pointer; font-family: ui-monospace, monospace; font-size: 12px; border-radius: 3px; }
+  .tree-item:hover { background: #21262d; }
+  .tree-item.active { background: #0c2c4d; color: var(--accent); }
+  .empty { color: var(--muted); font-style: italic; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HPC Dashboard</h1>
+  <span class="workspace mono" id="workspace">—</span>
+  <div class="progressbar" id="progress"></div>
+  <span id="counts"></span>
+  <span class="muted" style="font-size:12px;color:var(--muted)" id="updated">—</span>
+</header>
+
+<nav id="nav">
+  <button data-view="overview" class="active">Overview</button>
+  <button data-view="tasks">Tasks</button>
+  <button data-view="dag">DAG</button>
+  <button data-view="forks">Forks</button>
+  <button data-view="manifest">Manifest</button>
+  <button data-view="logs">Logs</button>
+  <button data-view="playback">Playback</button>
+</nav>
+
+<main id="main"></main>
+
+<div class="modal-bg" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script>
+// ── state ───────────────────────────────────────────────────────────────
+let view = "overview";
+let lastState = null;
+let pollTimer = null;
+const cache = {};
+const fmt = (d) => d ? new Date(d).toLocaleTimeString() : "—";
+
+// ── api ─────────────────────────────────────────────────────────────────
+async function api(path) {
+  const r = await fetch(path, { cache: "no-store" });
+  return r.json();
+}
+
+// ── header / progress ───────────────────────────────────────────────────
+async function refreshHeader() {
+  const s = await api("/api/state");
+  lastState = s;
+  document.getElementById("workspace").textContent = s.workspace;
+  document.getElementById("updated").textContent = "updated " + fmt(s.last_updated) + " · v" + s.version;
+  const counts = s.counts || {};
+  const order = ["COMPLETE", "IN_PROGRESS", "BLOCKED", "ESCALATED", "PLANNED", "LOCKED"];
+  // pills
+  const pills = order.filter(k => counts[k]).map(k => `<span class="pill ${k}">${k} <span class="v">${counts[k]}</span></span>`).join(" ");
+  document.getElementById("counts").innerHTML = pills + ` <span class="pill"><span class="v">${s.total}</span> total</span>`;
+  // progressbar
+  const total = s.total || 1;
+  const bar = document.getElementById("progress");
+  bar.innerHTML = order.map(k => {
+    const c = counts[k] || 0;
+    return c > 0 ? `<span class="${k}" title="${k}: ${c}" style="width:${(c / total * 100).toFixed(2)}%"></span>` : "";
+  }).join("");
+}
+
+// ── nav ─────────────────────────────────────────────────────────────────
+document.getElementById("nav").addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  for (const b of e.target.parentElement.querySelectorAll("button")) b.classList.remove("active");
+  e.target.classList.add("active");
+  view = e.target.dataset.view;
+  render();
+});
+
+// ── render dispatch ─────────────────────────────────────────────────────
+async function render() {
+  await refreshHeader();
+  const m = document.getElementById("main");
+  if (view === "overview") return renderOverview(m);
+  if (view === "tasks") return renderTasks(m);
+  if (view === "dag") return renderDag(m);
+  if (view === "forks") return renderForks(m);
+  if (view === "manifest") return renderManifest(m);
+  if (view === "logs") return renderLogs(m);
+  if (view === "playback") return renderPlayback(m);
+}
+
+// ── views: overview ─────────────────────────────────────────────────────
+async function renderOverview(m) {
+  const [tasks, forks, log] = await Promise.all([api("/api/tasks"), api("/api/forks"), api("/api/log?tail=20")]);
+  const busy = tasks.filter(t => t.status === "IN_PROGRESS" || t.status === "LOCKED");
+  const blocked = tasks.filter(t => t.status === "BLOCKED");
+  const recent = (log.lines || []).slice(-20).join("\n");
+  m.innerHTML = `
+    <div class="panel">
+      <h2>Active right now</h2>
+      ${busy.length ? `<table><thead><tr><th>Task</th><th>Worker</th><th>Started</th></tr></thead><tbody>
+        ${busy.map(t => `<tr onclick="showTask('${t.id}')"><td class="id">${t.id}</td><td class="mono">${t.locked_by || "—"}</td><td>${fmt(t.started_at)}</td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">No tasks running.</div>`}
+    </div>
+    <div class="panel">
+      <h2>Blocked</h2>
+      ${blocked.length ? `<table><thead><tr><th>Task</th><th>Fork</th><th>Last error</th></tr></thead><tbody>
+        ${blocked.map(t => `<tr onclick="showTask('${t.id}')"><td class="id">${t.id}</td><td class="mono">${t.assigned_fork_id || "—"}</td><td class="err">${escapeHtml(t.last_error || "")}</td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">Nothing blocked.</div>`}
+    </div>
+    <div class="panel">
+      <h2>Pending council deliberations</h2>
+      ${forks.pending.length ? `<table><thead><tr><th>Fork</th><th>Origin task</th><th>Area</th><th>Tier</th><th>Created</th><th>Guidance</th></tr></thead><tbody>
+        ${forks.pending.map(f => `<tr onclick="showFork('${f.dir_name}')"><td class="id">${f.fork_id}</td><td class="id">${f.originating_task_id || "—"}</td><td>${f.originating_area || "—"}</td><td>${f.council_tier || "—"}</td><td>${fmt(f.created_at)}</td><td>${f.has_human_guidance ? "✓" : ""}</td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">No forks pending.</div>`}
+    </div>
+    <div class="panel">
+      <h2>Recent log</h2>
+      <pre class="log">${escapeHtml(recent)}</pre>
+    </div>
+  `;
+}
+
+// ── views: tasks ────────────────────────────────────────────────────────
+let taskFilter = { q: "", status: "" };
+let taskSort = { col: "id", dir: 1 };
+async function renderTasks(m) {
+  const tasks = await api("/api/tasks");
+  cache.tasks = tasks;
+  const statuses = [...new Set(tasks.map(t => t.status))];
+  m.innerHTML = `
+    <div class="panel">
+      <div class="filters">
+        <input type="text" id="taskq" placeholder="Filter by id substring…" value="${escapeHtml(taskFilter.q)}">
+        <select id="tasks-status">
+          <option value="">all statuses (${tasks.length})</option>
+          ${statuses.map(s => `<option value="${s}" ${s === taskFilter.status ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      <div id="tasks-table"></div>
+    </div>
+  `;
+  document.getElementById("taskq").addEventListener("input", (e) => { taskFilter.q = e.target.value; renderTaskTable(); });
+  document.getElementById("tasks-status").addEventListener("change", (e) => { taskFilter.status = e.target.value; renderTaskTable(); });
+  renderTaskTable();
+}
+function renderTaskTable() {
+  const tasks = (cache.tasks || []).filter(t => {
+    if (taskFilter.status && t.status !== taskFilter.status) return false;
+    if (taskFilter.q && !t.id.toLowerCase().includes(taskFilter.q.toLowerCase())) return false;
+    return true;
+  }).sort((a, b) => {
+    const av = a[taskSort.col] ?? "", bv = b[taskSort.col] ?? "";
+    return (av > bv ? 1 : av < bv ? -1 : 0) * taskSort.dir;
+  });
+  const cols = [
+    ["id", "Task ID"], ["status", "Status"], ["retry_count", "Retry"],
+    ["assigned_fork_id", "Fork"], ["last_error", "Last error"],
+  ];
+  const html = `<table><thead><tr>${cols.map(([c, l]) => `<th data-col="${c}">${l}${taskSort.col === c ? (taskSort.dir > 0 ? " ↑" : " ↓") : ""}</th>`).join("")}</tr></thead><tbody>
+    ${tasks.map(t => `<tr onclick="showTask('${t.id}')">
+      <td class="id">${t.id}</td>
+      <td class="status ${t.status}">${t.status}</td>
+      <td>${t.retry_count}${t.requeue_count ? `/${t.requeue_count}rq` : ""}</td>
+      <td class="id">${t.assigned_fork_id || ""}</td>
+      <td class="err">${escapeHtml(t.last_error || "")}</td>
+    </tr>`).join("")}
+  </tbody></table>
+  <div class="muted" style="margin-top:8px;color:var(--muted);font-size:12px">${tasks.length} tasks</div>`;
+  const wrap = document.getElementById("tasks-table");
+  wrap.innerHTML = html;
+  wrap.querySelectorAll("th").forEach(th => th.addEventListener("click", () => {
+    const c = th.dataset.col;
+    if (taskSort.col === c) taskSort.dir *= -1;
+    else { taskSort.col = c; taskSort.dir = 1; }
+    renderTaskTable();
+  }));
+}
+
+// ── views: dag ──────────────────────────────────────────────────────────
+let dagState = { tx: 0, ty: 0, scale: 1 };
+let dagFilter = { area: "", epic: "" };
+async function renderDag(m) {
+  const dag = await api("/api/dag");
+  cache.dag = dag;
+  const areas = [...new Set(dag.nodes.map(n => n.area).filter(Boolean))].sort();
+  const epics = [...new Set(dag.nodes.map(n => n.epic_id).filter(Boolean))].sort();
+  m.innerHTML = `
+    <div class="panel">
+      <div class="filters">
+        <select id="dag-area"><option value="">all areas</option>${areas.map(a => `<option value="${a}" ${a === dagFilter.area ? "selected" : ""}>${a}</option>`).join("")}</select>
+        <select id="dag-epic"><option value="">all epics</option>${epics.map(e => `<option value="${e}" ${e === dagFilter.epic ? "selected" : ""}>${e}</option>`).join("")}</select>
+        <button class="btn" onclick="dagState={tx:0,ty:0,scale:1};drawDag()">reset view</button>
+        <span class="muted" style="color:var(--muted);font-size:12px">${dag.nodes.length} nodes · ${dag.edges.length} edges · drag to pan, wheel to zoom, click node for detail</span>
+      </div>
+      <svg id="dag-svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  `;
+  document.getElementById("dag-area").addEventListener("change", (e) => { dagFilter.area = e.target.value; drawDag(); });
+  document.getElementById("dag-epic").addEventListener("change", (e) => { dagFilter.epic = e.target.value; drawDag(); });
+  drawDag();
+}
+function drawDag() {
+  const svg = document.getElementById("dag-svg");
+  if (!svg || !cache.dag) return;
+  const dag = cache.dag;
+  // Filter visible nodes.
+  const visible = new Set(dag.nodes.filter(n => {
+    if (dagFilter.area && n.area !== dagFilter.area) return false;
+    if (dagFilter.epic && n.epic_id !== dagFilter.epic) return false;
+    return true;
+  }).map(n => n.id));
+  const nodes = dag.nodes.filter(n => visible.has(n.id));
+  const edges = dag.edges.filter(e => visible.has(e.from) && visible.has(e.to));
+
+  // Layout: layered. Group by layer; place nodes left-to-right within each layer.
+  const byLayer = {};
+  for (const n of nodes) (byLayer[n.layer] = byLayer[n.layer] || []).push(n);
+  const layers = Object.keys(byLayer).map(Number).sort((a, b) => a - b);
+  const layerGap = 130, nodeGap = 28;
+  const pos = {};
+  let maxX = 0;
+  layers.forEach((l, li) => {
+    byLayer[l].sort((a, b) => a.id.localeCompare(b.id));
+    byLayer[l].forEach((n, ni) => {
+      pos[n.id] = { x: 60 + li * layerGap, y: 30 + ni * nodeGap };
+      maxX = Math.max(maxX, pos[n.id].x + 60);
+    });
+  });
+  const maxY = 30 + Math.max(...layers.map(l => byLayer[l].length)) * nodeGap;
+  svg.setAttribute("viewBox", `${-dagState.tx} ${-dagState.ty} ${(maxX + 60) / dagState.scale} ${(maxY + 30) / dagState.scale}`);
+
+  const ns = "http://www.w3.org/2000/svg";
+  svg.innerHTML = "";
+  // Edges first (so nodes paint on top)
+  for (const e of edges) {
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) continue;
+    const path = document.createElementNS(ns, "path");
+    const c1x = (a.x + b.x) / 2, c1y = a.y, c2x = (a.x + b.x) / 2, c2y = b.y;
+    path.setAttribute("d", `M${a.x + 8},${a.y} C${c1x},${c1y} ${c2x},${c2y} ${b.x - 8},${b.y}`);
+    path.setAttribute("class", "edge");
+    path.dataset.from = e.from; path.dataset.to = e.to;
+    svg.appendChild(path);
+  }
+  // Nodes
+  for (const n of nodes) {
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("class", "node " + (n.status || "UNKNOWN"));
+    g.setAttribute("transform", `translate(${pos[n.id].x},${pos[n.id].y})`);
+    g.dataset.id = n.id;
+    const c = document.createElementNS(ns, "circle");
+    c.setAttribute("r", "6");
+    g.appendChild(c);
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", "10"); t.setAttribute("y", "3");
+    t.textContent = n.id.length > 28 ? n.id.slice(0, 25) + "…" : n.id;
+    g.appendChild(t);
+    g.addEventListener("click", () => showTask(n.id));
+    g.addEventListener("mouseenter", () => highlightDeps(n.id));
+    g.addEventListener("mouseleave", () => clearHighlight());
+    svg.appendChild(g);
+  }
+
+  // Pan / zoom
+  let dragging = false, lastX = 0, lastY = 0;
+  svg.onmousedown = (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; svg.classList.add("dragging"); };
+  svg.onmouseup = () => { dragging = false; svg.classList.remove("dragging"); };
+  svg.onmouseleave = () => { dragging = false; svg.classList.remove("dragging"); };
+  svg.onmousemove = (e) => {
+    if (!dragging) return;
+    dagState.tx += (e.clientX - lastX) * 1.5; dagState.ty += (e.clientY - lastY) * 1.5;
+    lastX = e.clientX; lastY = e.clientY;
+    svg.setAttribute("viewBox", `${-dagState.tx} ${-dagState.ty} ${(maxX + 60) / dagState.scale} ${(maxY + 30) / dagState.scale}`);
+  };
+  svg.onwheel = (e) => {
+    e.preventDefault();
+    dagState.scale *= e.deltaY < 0 ? 1.1 : 0.9;
+    dagState.scale = Math.max(0.2, Math.min(5, dagState.scale));
+    svg.setAttribute("viewBox", `${-dagState.tx} ${-dagState.ty} ${(maxX + 60) / dagState.scale} ${(maxY + 30) / dagState.scale}`);
+  };
+}
+function highlightDeps(id) {
+  const svg = document.getElementById("dag-svg");
+  const related = new Set([id]);
+  // Walk ancestors and descendants
+  const edgesByFrom = {}, edgesByTo = {};
+  for (const e of cache.dag.edges) {
+    (edgesByFrom[e.from] = edgesByFrom[e.from] || []).push(e.to);
+    (edgesByTo[e.to] = edgesByTo[e.to] || []).push(e.from);
+  }
+  const walk = (start, map) => {
+    const stack = [start];
+    while (stack.length) {
+      const n = stack.pop();
+      for (const nb of (map[n] || [])) if (!related.has(nb)) { related.add(nb); stack.push(nb); }
+    }
+  };
+  walk(id, edgesByFrom); walk(id, edgesByTo);
+  for (const node of svg.querySelectorAll(".node")) {
+    if (!related.has(node.dataset.id)) node.classList.add("dim");
+    else node.classList.remove("dim");
+  }
+  for (const edge of svg.querySelectorAll(".edge")) {
+    if (related.has(edge.dataset.from) && related.has(edge.dataset.to)) edge.classList.add("highlight");
+    else edge.classList.remove("highlight");
+  }
+}
+function clearHighlight() {
+  const svg = document.getElementById("dag-svg");
+  for (const n of svg.querySelectorAll(".node")) n.classList.remove("dim");
+  for (const e of svg.querySelectorAll(".edge")) e.classList.remove("highlight");
+}
+
+// ── views: forks ────────────────────────────────────────────────────────
+async function renderForks(m) {
+  const f = await api("/api/forks");
+  m.innerHTML = `
+    <div class="panel">
+      <h2>Pending (${f.pending.length})</h2>
+      ${f.pending.length ? `<table><thead><tr><th>Fork ID</th><th>Origin task</th><th>Area</th><th>Tier</th><th>Created</th><th>Guidance</th></tr></thead><tbody>
+        ${f.pending.map(x => `<tr onclick="showFork('${x.dir_name}')"><td class="id">${x.fork_id}</td><td class="id">${x.originating_task_id || ""}</td><td>${x.originating_area || ""}</td><td>${x.council_tier || ""}</td><td>${fmt(x.created_at)}</td><td>${x.has_human_guidance ? "✓" : ""}</td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">No pending forks.</div>`}
+    </div>
+    <div class="panel">
+      <h2>Resolved (${f.resolved.length})</h2>
+      ${f.resolved.length ? `<table><thead><tr><th>Fork ID</th><th>Origin task</th><th>Area</th><th>Resolved</th><th>Tasks amended</th><th>Contracts amended</th></tr></thead><tbody>
+        ${f.resolved.map(x => `<tr onclick="showFork('${x.dir_name}')"><td class="id">${x.fork_id}</td><td class="id">${x.originating_task_id || ""}</td><td>${x.originating_area || ""}</td><td>${fmt(x.resolved_at)}</td><td>${x.amendments.tasks}</td><td>${x.amendments.contracts}</td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty">No resolved forks.</div>`}
+    </div>
+  `;
+}
+
+// ── views: manifest ─────────────────────────────────────────────────────
+async function renderManifest(m) {
+  const mf = await api("/api/manifest");
+  cache.manifest = mf;
+  m.innerHTML = `
+    <div class="panel manifest-tree">
+      <div class="tree-pane">
+        <div class="filters">
+          <input type="text" id="mf-q" placeholder="Filter…">
+        </div>
+        <div id="mf-tree"></div>
+      </div>
+      <div>
+        <div id="mf-content" class="empty">Select a file from the tree.</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("mf-q").addEventListener("input", () => renderManifestTree());
+  renderManifestTree();
+}
+function renderManifestTree() {
+  const mf = cache.manifest;
+  const q = (document.getElementById("mf-q")?.value || "").toLowerCase();
+  const filt = items => items.filter(x => !q || (x.id || "").toLowerCase().includes(q) || (x.file || "").toLowerCase().includes(q));
+  const sec = (label, kind, items) => `
+    <div class="tree-section">
+      <h4>${label} (${items.length})</h4>
+      ${items.map(x => `<div class="tree-item" data-path="${kind}/${x.file}" onclick="loadManifestFile('${kind}/${x.file}', this)">${x.id || x.file}</div>`).join("")}
+    </div>`;
+  document.getElementById("mf-tree").innerHTML =
+    sec("Epics", "epics", filt(mf.epics)) +
+    sec("Tasks", "tasks", filt(mf.tasks)) +
+    sec("Contracts", "contracts", filt(mf.contracts));
+}
+async function loadManifestFile(p, el) {
+  document.querySelectorAll("#mf-tree .tree-item.active").forEach(x => x.classList.remove("active"));
+  el?.classList.add("active");
+  const r = await api("/api/manifest/file?path=" + encodeURIComponent(p));
+  document.getElementById("mf-content").outerHTML = `<pre class="code mono" id="mf-content">${escapeHtml(r.body || "(empty or missing)")}</pre>`;
+}
+
+// ── views: logs ─────────────────────────────────────────────────────────
+let logState = { name: null, autoscroll: true };
+async function renderLogs(m) {
+  const list = await api("/api/logs");
+  cache.logs = list;
+  if (!logState.name && list.length) logState.name = list[0].name;
+  m.innerHTML = `
+    <div class="panel">
+      <div class="filters">
+        <select id="log-pick">${list.map(l => `<option value="${l.name}" ${l.name === logState.name ? "selected" : ""}>${l.name} · ${(l.size / 1024).toFixed(1)} KB · ${fmt(l.mtime)}</option>`).join("")}</select>
+        <label><input type="checkbox" id="log-autoscroll" ${logState.autoscroll ? "checked" : ""}> auto-scroll</label>
+        <button class="btn" onclick="loadLog()">refresh</button>
+      </div>
+      <pre class="log" id="log-body"></pre>
+    </div>
+  `;
+  document.getElementById("log-pick").addEventListener("change", (e) => { logState.name = e.target.value; loadLog(); });
+  document.getElementById("log-autoscroll").addEventListener("change", (e) => { logState.autoscroll = e.target.checked; });
+  await loadLog();
+}
+async function loadLog() {
+  if (!logState.name) return;
+  const r = await api("/api/log?tail=500&name=" + encodeURIComponent(logState.name));
+  const body = document.getElementById("log-body");
+  if (!body) return;
+  body.innerHTML = (r.lines || []).map(colorLogLine).join("");
+  if (logState.autoscroll) body.scrollTop = body.scrollHeight;
+}
+function colorLogLine(line) {
+  const ts = line.match(/^\[([0-9TZ:.-]+)\]/);
+  let tail = ts ? line.slice(ts[0].length) : line;
+  let cls = "";
+  if (/worker-err|validator-err|err:|fail/.test(tail)) cls = "err";
+  else if (/task-ok|ok:|complete/.test(tail)) cls = "ok";
+  else if (/escalation|rescue|promoted|warn/.test(tail)) cls = "warn";
+  else if (/normalize|deliberation|fork/.test(tail)) cls = "info";
+  return `<span class="ts">${ts ? ts[0] : ""}</span><span class="${cls}">${escapeHtml(tail)}</span>\n`;
+}
+
+// ── views: playback ─────────────────────────────────────────────────────
+let pbState = { i: 0, playing: false, speed: 50, evs: [] };
+async function renderPlayback(m) {
+  const evs = await api("/api/history");
+  pbState.evs = evs;
+  pbState.i = evs.length - 1; // start at end
+  m.innerHTML = `
+    <div class="panel">
+      <div class="playback-controls">
+        <button class="btn" onclick="pbPlay()">▶ play</button>
+        <button class="btn" onclick="pbPause()">❚❚ pause</button>
+        <button class="btn" onclick="pbReset()">⏮ start</button>
+        <input type="range" id="pb-range" min="0" max="${evs.length - 1}" value="${pbState.i}">
+        <span class="mono" id="pb-position">${pbState.i + 1}/${evs.length}</span>
+        <select id="pb-speed">
+          <option value="25">0.25 s/event</option>
+          <option value="50" selected>0.05 s/event</option>
+          <option value="200">0.2 s/event</option>
+          <option value="500">0.5 s/event</option>
+        </select>
+      </div>
+      <div id="pb-status"></div>
+      <h4 style="margin:12px 0 4px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Events at or before cursor</h4>
+      <div class="event-list" id="pb-events"></div>
+    </div>
+  `;
+  document.getElementById("pb-range").addEventListener("input", (e) => { pbState.i = parseInt(e.target.value); pbRender(); });
+  document.getElementById("pb-speed").addEventListener("change", (e) => { pbState.speed = parseInt(e.target.value); });
+  pbRender();
+}
+function pbPlay() { pbState.playing = true; pbStep(); }
+function pbPause() { pbState.playing = false; }
+function pbReset() { pbState.i = 0; document.getElementById("pb-range").value = 0; pbRender(); }
+function pbStep() {
+  if (!pbState.playing) return;
+  if (pbState.i >= pbState.evs.length - 1) { pbState.playing = false; return; }
+  pbState.i++; document.getElementById("pb-range").value = pbState.i;
+  pbRender();
+  setTimeout(pbStep, pbState.speed);
+}
+function pbRender() {
+  const evs = pbState.evs;
+  document.getElementById("pb-position").textContent = `${pbState.i + 1}/${evs.length}`;
+  // Compute a derived task-status snapshot from events 0..i.
+  const status = {};
+  for (let j = 0; j <= pbState.i; j++) {
+    const e = evs[j];
+    if (!e.task_id) continue;
+    if (e.kind === "worker_start") status[e.task_id] = "IN_PROGRESS";
+    else if (e.kind === "task_ok") status[e.task_id] = "COMPLETE";
+    else if (e.kind === "worker_err") status[e.task_id] = "ERR";
+    else if (e.kind === "validator_err") status[e.task_id] = "ERR";
+    else if (e.kind === "rescue" || e.kind === "block") status[e.task_id] = "BLOCKED";
+  }
+  const c = {};
+  for (const v of Object.values(status)) c[v] = (c[v] || 0) + 1;
+  document.getElementById("pb-status").innerHTML = `<div class="mono" style="font-size:12px;color:var(--muted)">Snapshot at event ${pbState.i + 1} (${evs[pbState.i]?.ts || "—"}): ${Object.entries(c).map(([k, v]) => `${k}=${v}`).join(", ")}</div>`;
+  // Show last ~80 events around the cursor.
+  const start = Math.max(0, pbState.i - 80);
+  const slice = evs.slice(start, pbState.i + 1).reverse();
+  document.getElementById("pb-events").innerHTML = slice.map(e =>
+    `<div class="row"><span class="ts">${e.ts}</span> <span class="kind ${e.kind}">${e.kind}</span> ${e.task_id ? `<a href="#" onclick="event.preventDefault();showTask('${e.task_id}')">${e.task_id}</a>` : ""}${e.fork_id ? ` <a href="#" onclick="event.preventDefault();showFork('${e.fork_id}')">${e.fork_id}</a>` : ""} <span class="muted" style="color:var(--muted)">${escapeHtml(e.body.slice(0, 160))}</span></div>`
+  ).join("");
+}
+
+// ── modals ──────────────────────────────────────────────────────────────
+async function showTask(id) {
+  const t = await api("/api/tasks/" + encodeURIComponent(id));
+  if (!t || t.error) return;
+  const s = t.state;
+  openModal(`Task ${id}`, `
+    <div style="display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:13px">
+      <div class="muted" style="color:var(--muted)">Status</div><div class="status ${s.status}">${s.status}</div>
+      <div class="muted" style="color:var(--muted)">Retries</div><div>${s.retry_count || 0} (requeues: ${s.requeue_count || 0})</div>
+      <div class="muted" style="color:var(--muted)">Worker model</div><div>${s.worker_model_override || "(default)"}</div>
+      <div class="muted" style="color:var(--muted)">Locked by</div><div class="mono">${s.locked_by || "—"}</div>
+      <div class="muted" style="color:var(--muted)">Started</div><div>${s.started_at || "—"}</div>
+      <div class="muted" style="color:var(--muted)">Completed</div><div>${s.completed_at || "—"}</div>
+      <div class="muted" style="color:var(--muted)">Blocked at</div><div>${s.blocked_at || "—"}</div>
+      <div class="muted" style="color:var(--muted)">Fork</div><div>${s.assigned_fork_id ? `<a href="#" onclick="event.preventDefault();closeModal();showFork('${s.assigned_fork_id}')">${s.assigned_fork_id}</a>` : "—"}</div>
+      <div class="muted" style="color:var(--muted)">Blocked by</div><div class="mono">${s.blocked_by_upstream || "—"}</div>
+      <div class="muted" style="color:var(--muted)">Validation</div><div class="err">${escapeHtml(s.validation_result || "—")}</div>
+    </div>
+    ${s.error_history && s.error_history.length ? `
+      <h4 style="margin:14px 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Error history (${s.error_history.length})</h4>
+      <pre class="code mono">${escapeHtml(s.error_history.map(e => typeof e === "string" ? e : JSON.stringify(e)).join("\n\n"))}</pre>
+    ` : ""}
+    ${s.escalation_history && s.escalation_history.length ? `
+      <h4 style="margin:14px 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Escalation history (${s.escalation_history.length})</h4>
+      <pre class="code mono">${escapeHtml(s.escalation_history.map(e => typeof e === "string" ? e : JSON.stringify(e)).join("\n\n"))}</pre>
+    ` : ""}
+    ${t.spec ? `
+      <h4 style="margin:14px 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Task spec (${t.spec.file})</h4>
+      <pre class="code mono">${escapeHtml(t.spec.body)}</pre>
+    ` : ""}
+  `);
+}
+async function showFork(idOrDir) {
+  const f = await api("/api/forks/" + encodeURIComponent(idOrDir));
+  if (!f || f.error) return;
+  openModal(`Fork ${f.fork_id}${f.resolved ? " (resolved)" : ""}`, `
+    <h4 style="margin:0 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Origin</h4>
+    <pre class="code mono">${escapeHtml(f.origin_yaml || "")}</pre>
+    ${f.original_tasks?.length ? `
+      <h4 style="margin:14px 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Original task spec(s)</h4>
+      ${f.original_tasks.map(t => `<div class="muted" style="color:var(--muted);font-size:12px">${t.name}</div><pre class="code mono">${escapeHtml(t.body)}</pre>`).join("")}
+    ` : ""}
+    ${f.amended_tasks?.length ? `
+      <h4 style="margin:14px 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Amended task(s)</h4>
+      ${f.amended_tasks.map(t => `<div class="muted" style="color:var(--muted);font-size:12px">${t.name}</div><pre class="code mono">${escapeHtml(t.body)}</pre>`).join("")}
+    ` : ""}
+    ${f.amended_contracts?.length ? `
+      <h4 style="margin:14px 0 6px 0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Amended contract(s)</h4>
+      ${f.amended_contracts.map(t => `<div class="muted" style="color:var(--muted);font-size:12px">${t.name}</div><pre class="code mono">${escapeHtml(t.body)}</pre>`).join("")}
+    ` : ""}
+  `);
+}
+function openModal(title, html) {
+  const body = document.getElementById("modal-body");
+  body.innerHTML = `<div class="modal-head"><h3>${escapeHtml(title)}</h3><button class="close" onclick="closeModal()">×</button></div>${html}`;
+  document.getElementById("modal").classList.add("open");
+}
+function closeModal() { document.getElementById("modal").classList.remove("open"); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+// ── util ────────────────────────────────────────────────────────────────
+function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+// ── boot ───────────────────────────────────────────────────────────────
+render();
+// Refresh active view + header every 2s.
+pollTimer = setInterval(async () => {
+  await refreshHeader();
+  // Light auto-refresh: only the current view's quick-update slice
+  if (view === "overview") renderOverview(document.getElementById("main"));
+  else if (view === "tasks") renderTasks(document.getElementById("main"));
+  else if (view === "logs") loadLog();
+  else if (view === "forks") renderForks(document.getElementById("main"));
+  // dag, manifest, playback don't auto-refresh — too disruptive
+}, 2000);
+</script>
+</body>
+</html>

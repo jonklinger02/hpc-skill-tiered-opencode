@@ -1,0 +1,1 @@
+{"name":"hpc-skill-opencode","version":"1.0.0","private":true,"dependencies":{"@opencode-ai/sdk":"^1.17.18","js-yaml":"^4.1.1"}}

@@ -1,0 +1,88 @@
+{
+  "id": "nextjs-app",
+  "description": "Next.js App Router (app/ directory, route.ts handlers).",
+  "priority": 60,
+  "match": {
+    "frameworks": [
+      "nextjs",
+      "next"
+    ],
+    "languages": [],
+    "signals": [
+      "app-router"
+    ]
+  },
+  "root_markers": [
+    "next.config.js",
+    "next.config.ts",
+    "next.config.mjs",
+    "package.json"
+  ],
+  "entry_files": [
+    "app/layout.tsx",
+    "app/page.tsx",
+    "next.config.js"
+  ],
+  "default_role": "lib",
+  "classify": [
+    {
+      "pattern": "(^|/)(next\\.config|tailwind\\.config|postcss\\.config|tsconfig)\\.",
+      "role": "config"
+    },
+    {
+      "pattern": "\\.(test|spec)\\.[a-zA-Z0-9]+$",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)(__tests__|tests?|e2e)/",
+      "role": "test"
+    },
+    {
+      "pattern": "(^|/)app/.*/route\\.[tj]sx?$",
+      "role": "api"
+    },
+    {
+      "pattern": "(^|/)app/",
+      "role": "route"
+    },
+    {
+      "pattern": "(^|/)pages/api/",
+      "role": "api"
+    },
+    {
+      "pattern": "(^|/)pages/",
+      "role": "route"
+    },
+    {
+      "pattern": "\\.(css|scss|sass|less)$",
+      "role": "style"
+    },
+    {
+      "pattern": "(^|/)hooks?/|/use[A-Z][A-Za-z0-9]*\\.[tj]sx?$",
+      "role": "hook"
+    },
+    {
+      "pattern": "(^|/)components?/|\\.(tsx|jsx)$",
+      "role": "component"
+    },
+    {
+      "pattern": "(^|/)types?/|\\.d\\.ts$",
+      "role": "type"
+    }
+  ],
+  "layout": {
+    "route": "app",
+    "api": "app/api",
+    "component": "components",
+    "hook": "hooks",
+    "style": "styles",
+    "type": "types",
+    "lib": "lib",
+    "config": ".",
+    "test": "__tests__"
+  },
+  "enforce": [
+    "route",
+    "api"
+  ]
+}
