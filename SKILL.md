@@ -1,6 +1,6 @@
 ---
-name: hpc-tiered
-description: "Hierarchical Planning Compiler (tiered-model variant) — same manifest-driven product build as the `hpc` skill, but with a central cheap/capable model registry (models.yaml) that routes high-volume mechanical work to cheap models and the highest-leverage gates to the most capable ones. Use when the user EXPLICITLY asks for the tiered, cost-optimized, or model-registry build variant — e.g. 'build with hpc-tiered', 'use the tiered model build', 'cost-optimized HPC build'. For a plain 'build this app' / 'implement this PRD' with no model-tiering ask, use the `hpc` skill instead. Do NOT use for simple code snippets, single-file tasks, or questions about how HPC works — only for full product builds where the tiered variant is requested."
+name: hpc-tiered-opencode
+description: "Hierarchical Planning Compiler (OpenCode-native tiered variant) — manifest-driven product build that routes tasks across cheap/capable/frontier models via models.yaml, running all sub-agents through `opencode serve` instead of the claude CLI. Multi-model councils split Claude (proposers) and GPT-5.5 (Critic+Synthesizer+reviewer). Use when asked for 'hpc-tiered-opencode', 'opencode hpc build', or when running inside OpenCode and wanting cost-optimized multi-model HPC. For the Claude Code variant use `hpc-tiered`; for a plain build with no model-tiering use `hpc`. Do NOT use for simple code snippets, single-file tasks, or questions about how HPC works — only for full product builds."
 ---
 
 # Hierarchical Planning Compiler (HPC)
