@@ -37,6 +37,7 @@ tiers:
   # earns its cost outright: the C-Suite plan the whole build inherits, and the
   # acceptance verdict that decides ship / no-ship.
   frontier: { providerID: anthropic, modelID: claude-fable-5 }
+  review:   { providerID: openai,    modelID: gpt-5.5 }
 
 assignments:
   # ── Execution workers (the promotion ladder: cheap → standard → capable) ──
@@ -69,6 +70,9 @@ assignments:
 
   # ── Phase-5 acceptance ──
   acceptance_judge:      frontier   # one judge per criterion vs the running app
+  council_review:        review     # GPT-5.5 second-model review after council output
+  csuite_critic_pass:    review     # GPT-5.5 critic+synthesizer pass after Claude proposers
+  director_critic_pass:  review     # GPT-5.5 critic+synthesizer pass after Claude proposers
 
   # ── Recovery ladder councils ──
   recovery_director:     standard

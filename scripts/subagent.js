@@ -537,6 +537,73 @@ ABSOLUTELY DO NOT split your output into "pieces" with markdown dividers
   return systemPrompt;
 }
 
+function personaBlocks(names) {
+  let out = "";
+  for (const name of names) {
+    const prompt = loadPersona(name);
+    if (prompt) out += `--- ${name.toUpperCase()} ---\n${prompt}\n\n`;
+  }
+  return out;
+}
+
+function buildCouncilProposersPrompt(tier, area = null, manifestDir = null) {
+  const skillDir = path.resolve(__dirname, "..");
+  const protocolsFile = path.join(skillDir, "references", "council-protocols.md");
+  const schemasFile = path.join(skillDir, "references", "manifest-schema.md");
+
+  let systemPrompt = "";
+  if (tier === "csuite") {
+    systemPrompt = `You are running the PROPOSER PHASE of a C-Suite planning council.\n\n`;
+    systemPrompt += personaBlocks(["csuite", "product-strategist", "quality-strategist"]);
+    systemPrompt += `\nDELIBERATION PROTOCOL (Proposer Phase — do NOT synthesize yet):\n1. As Visionary: propose the epic structure and architecture\n2. As Product Strategist: validate requirement coverage and priority\n3. As Quality Strategist: annotate testability and flag NFR gaps\n\nOutput structured deliberation only. Include proposed epic structure, architecture decisions, coverage analysis, and testability annotations. Do NOT emit the final YAML yet. GPT-5.5 will run Critic+Synthesizer in the next pass.`;
+  } else if (tier === "director") {
+    systemPrompt = `You are running the PROPOSER PHASE of a Director council for the ${area} functional area.\n\n`;
+    systemPrompt += personaBlocks(["director", "integration-architect"]);
+    systemPrompt += `\nDELIBERATION PROTOCOL (Proposer Phase — do NOT synthesize yet):\n1. As Domain Lead: propose task groups for your functional area\n2. As Integration Architect: draft interface contracts for cross-domain boundaries\n\nOutput structured deliberation only. Include proposed task groups, contracts with surface definitions, namespace claims, and rationale. Do NOT emit the final YAML yet. GPT-5.5 will run Critic+Synthesizer in the next pass.`;
+    systemPrompt += manifestAwarenessBlock(tier, skillDir, manifestDir);
+    systemPrompt += mintBlock(tier, skillDir, manifestDir);
+  }
+
+  const protocols = safeRead(protocolsFile);
+  if (protocols) systemPrompt += `\n\nCOUNCIL PROTOCOLS:\n${protocols}`;
+  const schemas = safeRead(schemasFile);
+  if (schemas) systemPrompt += `\n\nMANIFEST SCHEMA REFERENCE:\n${schemas}`;
+  return systemPrompt;
+}
+
+function buildCouncilCritiquePrompt(tier, area = null, manifestDir = null) {
+  const skillDir = path.resolve(__dirname, "..");
+  let systemPrompt = "";
+  if (tier === "csuite") {
+    systemPrompt = `You are running the GPT-5.5 CRITIC+SYNTHESIZER PHASE of a C-Suite planning council.\n\n`;
+    systemPrompt += personaBlocks(["critic", "synthesizer"]);
+    systemPrompt += `\nAs Critic: challenge the proposer output — find gaps, contradictions, assumptions, missing requirements, missing glue epic ownership, and missing deferral dispositions.\nAs Synthesizer: reconcile the proposer output and critique into a single final YAML document.\n\nPLAN-COMPLETENESS REQUIREMENTS:\n1. Emit top-level tech_stack.\n2. If tech_stack declares api_server, web_ui, or ssr_app, emit E-GLUE-000.\n3. Any deferred decisions_log entry MUST include deferral_disposition.\n\nOUTPUT: Produce a single YAML document containing tech_stack, epics, architecture, dag, functional_areas, and decisions_log. Return ONLY valid YAML. No markdown fencing, no preamble.`;
+  } else if (tier === "director") {
+    systemPrompt = `You are running the GPT-5.5 CRITIC+SYNTHESIZER PHASE of a Director council for the ${area} functional area.\n\n`;
+    systemPrompt += personaBlocks(["critic", "synthesizer"]);
+    systemPrompt += `\nAs Critic: reject malformed task-group boundaries, missing surfaces, bad cross-area bindings, unminted IDs, and deferred decisions without disposition.\nAs Synthesizer: reconcile the proposer output and critique into a single final YAML document.\n\nCONTRACT REQUIREMENTS:\n- Every contract MUST include a non-empty structured surface block.\n- Surface entries must have complete signatures, never TBD placeholders.\n- Cross-area boundaries must reuse or extend existing manifest contracts when appropriate.\n\nOUTPUT: Produce a single YAML document with task_groups, contracts, namespace_claims, and decisions_log. Return ONLY valid YAML. No markdown fencing, no preamble.`;
+    systemPrompt += manifestAwarenessBlock(tier, skillDir, manifestDir);
+    systemPrompt += mintBlock(tier, skillDir, manifestDir);
+  }
+  return systemPrompt;
+}
+
+async function reviewCouncilOutput(persona, outputDir, yaml, planTimeout) {
+  const reviewer = loadPersona("council-reviewer");
+  if (!reviewer) return;
+  const reviewMessage = [
+    "--- COUNCIL OUTPUT YAML ---",
+    yaml,
+    "\nReview this YAML for CRITICAL downstream-breaking issues only. If none, output exactly: APPROVED",
+  ].join("\n\n");
+  const result = await callClaude("council_review", reviewer, reviewMessage, 4000, planTimeout, "", null);
+  if (result.error) return;
+  const text = (result.text || "").trim();
+  const reviewPath = path.join(outputDir || ".", `${persona}-review.txt`);
+  try { fs.writeFileSync(reviewPath, text); } catch {}
+  if (!/^APPROVED\b/i.test(text)) console.error(`[council-review] ${text}`);
+}
+
 // Map a target file path to its line-comment prefix so the worker prompt can
 // ask for a SYNOPSIS block in the correct comment syntax (was always "#",
 // which is invalid in TS/Rust/SQL/etc and produced parse-broken outputs).
@@ -758,8 +825,6 @@ async function main() {
                : args.persona === "director" ? "director" 
                : "engineer";
     
-    systemPrompt = buildCouncilPrompt(tier, args.area, args.manifestDir);
-    
     // Build user message from inputs. `--input` accepts either a file or a
     // directory — directories are expanded to all .yaml files inside (the
     // SKILL.md director step passes manifest/epics/ as a directory).
@@ -793,30 +858,58 @@ async function main() {
       }
     }
 
-    parts.push(`\nRun the ${tier} council deliberation and produce the synthesized output.`);
-    if (args.area) parts.push(`Functional area: ${args.area}`);
-
-    userMessage = parts.join("\n\n");
-    maxTokens = tier === "csuite" ? 16000 : 12000;
-
-    // Binding contracts make Director/Engineer outputs more verbose (structured
-    // surface: blocks, invokes/implements enumerations). Bump effort to "high"
-    // so the council has the output budget to emit complete YAML — without
-    // this, councils truncate task_groups/contracts and only the tail
-    // (decisions_log) survives, breaking the manifest.
-    const effort = (tier === "director" && process.env.HPC_DIRECTOR_EFFORT === "max") ? "max" : (tier === "director" || tier === "engineer") ? "high" : null;
-
     const planTimeout = (args.timeoutMs && !Number.isNaN(args.timeoutMs)) ? args.timeoutMs : PLANNING_TIMEOUT_MS;
-    // Director/Engineer councils need Bash to call mint-id.js for canonical IDs.
-    const planTools = args.tools || ((tier === "director" || tier === "engineer") ? "Bash" : "");
-    const result = await callClaude(args.model, systemPrompt, userMessage, maxTokens, planTimeout, planTools, effort);
+    let yaml = "";
+    if (tier === "csuite" || tier === "director") {
+      const pass1Prompt = buildCouncilProposersPrompt(tier, args.area, args.manifestDir);
+      const pass1Message = [
+        ...parts,
+        `\nRun the ${tier} proposer deliberation. Do NOT synthesize final YAML yet.`,
+        ...(args.area ? [`Functional area: ${args.area}`] : []),
+      ].join("\n\n");
+      const pass1Tools = args.tools || (tier === "director" ? "Bash" : "");
+      const pass1Effort = tier === "director" ? "high" : null;
+      const pass1Result = await callClaude(args.model, pass1Prompt, pass1Message, 12000, planTimeout, pass1Tools, pass1Effort);
+      if (pass1Result.error) {
+        console.log(`err:api:pass1:${pass1Result.error}`);
+        process.exit(1);
+      }
 
-    if (result.error) {
-      console.log(`err:api:${result.error}`);
-      process.exit(1);
+      const pass2Model = tier === "csuite" ? "csuite_critic_pass" : "director_critic_pass";
+      const pass2Prompt = buildCouncilCritiquePrompt(tier, args.area, args.manifestDir);
+      const pass2Message = [
+        "--- PROPOSER DELIBERATION OUTPUT ---",
+        pass1Result.text,
+        "--- ORIGINAL INPUTS ---",
+        ...parts,
+        `\nRun Critic+Synthesizer and produce the final ${tier} YAML artifact.`,
+        ...(args.area ? [`Functional area: ${args.area}`] : []),
+      ].join("\n\n");
+      const pass2Tools = args.tools || (tier === "director" ? "Bash" : "");
+      const pass2Effort = (tier === "director" && process.env.HPC_DIRECTOR_EFFORT === "max") ? "max" : (tier === "director" ? "high" : null);
+      const pass2Result = await callClaude(pass2Model, pass2Prompt, pass2Message, tier === "csuite" ? 16000 : 12000, planTimeout, pass2Tools, pass2Effort);
+      if (pass2Result.error) {
+        console.log(`err:api:pass2:${pass2Result.error}`);
+        process.exit(1);
+      }
+      yaml = extractYAML(pass2Result.text);
+    } else {
+      systemPrompt = buildCouncilPrompt(tier, args.area, args.manifestDir);
+      parts.push(`\nRun the ${tier} council deliberation and produce the synthesized output.`);
+      if (args.area) parts.push(`Functional area: ${args.area}`);
+      userMessage = parts.join("\n\n");
+      maxTokens = 12000;
+      const effort = "high";
+      const planTools = args.tools || "Bash";
+      const result = await callClaude(args.model, systemPrompt, userMessage, maxTokens, planTimeout, planTools, effort);
+      if (result.error) {
+        console.log(`err:api:${result.error}`);
+        process.exit(1);
+      }
+      yaml = extractYAML(result.text);
     }
 
-    const yaml = extractYAML(result.text);
+    await reviewCouncilOutput(args.persona, args.outputDir || ".", yaml, planTimeout);
     const outFile = writeCouncilArtifacts(yaml, args.outputDir || ".", args.persona);
     console.log("ok");
 
